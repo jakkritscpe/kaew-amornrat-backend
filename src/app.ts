@@ -9,6 +9,7 @@ import attendanceRoutes from './modules/attendance/routes';
 import otRoutes from './modules/ot-requests/routes';
 import settingsRoutes from './modules/settings/routes';
 import qrRoutes from './modules/qr-checkin/routes';
+import wsRouter, { websocket } from './modules/ws/routes';
 
 export interface Variables {
   jwtPayload: {
@@ -38,6 +39,9 @@ export function createApp() {
   app.route('/api/ot-requests', otRoutes);
   app.route('/api/settings', settingsRoutes);
   app.route('/api/qr-checkin', qrRoutes);
+  app.route('/ws', wsRouter);
 
   return app;
 }
+
+export { websocket };

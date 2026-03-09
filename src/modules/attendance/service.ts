@@ -2,9 +2,11 @@ import { eq, and, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { attendanceLogs, employees } from '../../db/schema';
 import { isWithinRadius, calculateDistance } from '../../shared/utils/geo';
-import { calculateWorkHours, calculateOTHours, isLate, todayDate } from '../../shared/utils/time';
+import { calculateWorkHours, calculateOTHours, isLate, todayDate, timeToMinutes } from '../../shared/utils/time';
 import { getEmployee } from '../employees/service';
 import { listLocations } from '../locations/service';
+import { wsManager } from '../../shared/ws/manager';
+import { createEvent } from '../../shared/ws/events';
 
 export async function getLogs(filter: {
   employeeId?: string; date?: string; startDate?: string; endDate?: string; status?: string;
@@ -75,10 +77,24 @@ export async function checkIn(employeeId: string, lat: number, lng: number) {
   const status = late ? 'late' : 'present';
   const id = `log_${Date.now()}`;
 
+  const checkInDate = new Date(now);
+  const minutesLate = late
+    ? Math.round(
+        (checkInDate.getHours() * 60 + checkInDate.getMinutes()) -
+        timeToMinutes(employee.shiftStartTime)
+      )
+    : 0;
+
   if (existing) {
     await db.update(attendanceLogs)
       .set({ checkInTime: new Date(now), checkInLat: lat, checkInLng: lng, status, locationId, updatedAt: new Date() })
       .where(eq(attendanceLogs.id, existing.id));
+    wsManager.broadcast(createEvent(
+      late ? 'LATE' : 'CHECK_IN',
+      employeeId,
+      employee.name,
+      { locationName: locationId ?? 'ไม่ระบุ', time: now, minutesLate }
+    ));
     return getTodayLog(employeeId);
   }
 
@@ -89,6 +105,13 @@ export async function checkIn(employeeId: string, lat: number, lng: number) {
     status, locationId,
     workHours: 0, otHours: 0,
   });
+
+  wsManager.broadcast(createEvent(
+    late ? 'LATE' : 'CHECK_IN',
+    employeeId,
+    employee.name,
+    { locationName: locationId ?? 'ไม่ระบุ', time: now, minutesLate }
+  ));
 
   return getTodayLog(employeeId);
 }
@@ -112,6 +135,13 @@ export async function checkOut(employeeId: string, lat: number, lng: number) {
       updatedAt: new Date(),
     })
     .where(eq(attendanceLogs.id, log.id));
+
+  wsManager.broadcast(createEvent(
+    'CHECK_OUT',
+    employeeId,
+    employee.name,
+    { workHours: Number(workHours.toFixed(2)), otHours: Number(otHours.toFixed(2)), time: now }
+  ));
 
   return getTodayLog(employeeId);
 }
