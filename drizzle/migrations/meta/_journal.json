@@ -15,6 +15,20 @@
       "when": 1773044681688,
       "tag": "0001_wandering_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773049327535,
+      "tag": "0002_premium_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773100000000,
+      "tag": "0003_add_accessible_menus",
+      "breakpoints": true
     }
   ]
 }

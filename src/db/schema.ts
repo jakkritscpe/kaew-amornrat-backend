@@ -9,6 +9,7 @@ import {
   date,
   time,
   pgEnum,
+  index,
 } from 'drizzle-orm/pg-core';
 
 // Enums
@@ -52,6 +53,7 @@ export const employees = pgTable('employees', {
   otRateValue: real('ot_rate_value'),
   avatarUrl: text('avatar_url'),
   qrToken: text('qr_token').unique(),
+  accessibleMenus: text('accessible_menus'), // JSON array e.g. '["dashboard","requests"]'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -73,7 +75,12 @@ export const attendanceLogs = pgTable('attendance_logs', {
   locationId: text('location_id').references(() => workLocations.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (t) => ({
+  employeeIdIdx: index('attendance_logs_employee_id_idx').on(t.employeeId),
+  dateIdx: index('attendance_logs_date_idx').on(t.date),
+  statusIdx: index('attendance_logs_status_idx').on(t.status),
+  employeeDateIdx: index('attendance_logs_employee_date_idx').on(t.employeeId, t.date),
+}));
 
 // OT Requests
 export const otRequests = pgTable('ot_requests', {
@@ -86,7 +93,10 @@ export const otRequests = pgTable('ot_requests', {
   status: otStatusEnum('status').notNull().default('pending'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (t) => ({
+  employeeIdIdx: index('ot_requests_employee_id_idx').on(t.employeeId),
+  statusIdx: index('ot_requests_status_idx').on(t.status),
+}));
 
 // Company Settings (single row)
 export const companySettings = pgTable('company_settings', {

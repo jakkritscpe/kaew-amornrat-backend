@@ -25,10 +25,12 @@ export function todayDate(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-// Check if employee is late (more than 15 minutes after shift start)
+// Check if employee is late (more than LATE_THRESHOLD_MINUTES after shift start)
+import { LATE_THRESHOLD_MINUTES } from '../config';
+
 export function isLate(shiftStart: string, checkInTime: string): boolean {
   const shiftMinutes = timeToMinutes(shiftStart);
   const checkInDate = new Date(checkInTime);
   const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
-  return checkInMinutes > shiftMinutes + 15;
+  return checkInMinutes > shiftMinutes + LATE_THRESHOLD_MINUTES;
 }

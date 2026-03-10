@@ -43,7 +43,7 @@ export async function authMiddleware(c: Context, next: Next) {
   }
   const token = authorization.slice(7);
   try {
-    const payload = await verifyJWT(token, process.env.JWT_SECRET ?? 'secret');
+    const payload = await verifyJWT(token, process.env.JWT_SECRET!);
     c.set('jwtPayload', payload);
     await next();
   } catch {

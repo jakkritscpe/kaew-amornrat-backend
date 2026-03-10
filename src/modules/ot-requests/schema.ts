@@ -14,4 +14,6 @@ export const updateOTStatusSchema = z.object({
 export const listOTSchema = z.object({
   status: z.enum(['pending', 'approved', 'rejected']).optional(),
   employeeId: z.string().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });

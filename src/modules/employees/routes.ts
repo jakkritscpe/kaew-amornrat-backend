@@ -14,6 +14,13 @@ employeesRouter.get('/', guardRole('admin', 'manager'), zValidator('query', list
   return c.json(ok(data));
 });
 
+// PUT /api/employees/:id/menus (admin only - update accessible menus)
+employeesRouter.put('/:id/menus', guardRole('admin'), async (c) => {
+  const body = await c.req.json() as { accessibleMenus: string[] };
+  const data = await updateEmployee(c.req.param('id'), { accessibleMenus: body.accessibleMenus } as any);
+  return c.json(ok(data, 'Menus updated'));
+});
+
 employeesRouter.get('/:id', guardRole('admin', 'manager'), async (c) => {
   const data = await getEmployee(c.req.param('id'));
   return c.json(ok(data));

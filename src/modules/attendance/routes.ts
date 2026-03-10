@@ -18,8 +18,9 @@ attendanceRouter.get('/logs/today', async (c) => {
   return c.json(ok(await getTodayLog(payload.sub)));
 });
 
-attendanceRouter.get('/logs/:employeeId', guardRole('admin', 'manager'), async (c) => {
-  return c.json(ok(await getLogs({ employeeId: c.req.param('employeeId') })));
+attendanceRouter.get('/logs/:employeeId', guardRole('admin', 'manager'), zValidator('query', listLogsSchema), async (c) => {
+  const query = c.req.valid('query');
+  return c.json(ok(await getLogs({ ...query, employeeId: c.req.param('employeeId') })));
 });
 
 attendanceRouter.post('/check-in', zValidator('json', checkInSchema), async (c) => {

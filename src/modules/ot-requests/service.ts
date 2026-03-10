@@ -1,22 +1,36 @@
-import { eq, and, type SQL } from 'drizzle-orm';
+import { eq, and, count, desc, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { otRequests, employees } from '../../db/schema';
 import { wsManager } from '../../shared/ws/manager';
 import { createEvent } from '../../shared/ws/events';
 
-export async function listOTRequests(filter: { status?: string; employeeId?: string }) {
+export async function listOTRequests(filter: { status?: string; employeeId?: string; page?: number; limit?: number }) {
+  const page = filter.page ?? 1;
+  const limit = filter.limit ?? 50;
+  const offset = (page - 1) * limit;
+
   const conditions: SQL[] = [];
   if (filter.status) conditions.push(eq(otRequests.status, filter.status as 'pending' | 'approved' | 'rejected'));
   if (filter.employeeId) conditions.push(eq(otRequests.employeeId, filter.employeeId));
 
-  const rows = await db
-    .select({ ot: otRequests, employeeName: employees.name, employeeDepartment: employees.department })
-    .from(otRequests)
-    .leftJoin(employees, eq(otRequests.employeeId, employees.id))
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(otRequests.createdAt);
+  const where = conditions.length ? and(...conditions) : undefined;
 
-  return rows.map(({ ot, employeeName, employeeDepartment }) => ({ ...ot, employeeName, employeeDepartment }));
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({ ot: otRequests, employeeName: employees.name, employeeDepartment: employees.department })
+      .from(otRequests)
+      .leftJoin(employees, eq(otRequests.employeeId, employees.id))
+      .where(where)
+      .orderBy(desc(otRequests.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ total: count() }).from(otRequests).where(where),
+  ]);
+
+  return {
+    data: rows.map(({ ot, employeeName, employeeDepartment }) => ({ ...ot, employeeName, employeeDepartment })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 }
 
 export async function submitOTRequest(employeeId: string, data: {

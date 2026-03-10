@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 export const checkInSchema = z.object({
-  lat: z.number(),
-  lng: z.number(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
 });
 
 export const checkOutSchema = z.object({
-  lat: z.number(),
-  lng: z.number(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
 });
 
 export const listLogsSchema = z.object({
@@ -16,6 +16,8 @@ export const listLogsSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   status: z.enum(['present', 'late', 'absent', 'on_leave']).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
 export const updateLogSchema = z.object({

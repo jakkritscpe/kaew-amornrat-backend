@@ -3,12 +3,11 @@ import { db } from '../../db';
 import { employees } from '../../db/schema';
 
 async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  return Bun.password.hash(password);
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return Bun.password.verify(password, hash);
 }
 
 async function signJWT(payload: Record<string, unknown>, secret: string, expiresIn?: number): Promise<string> {
@@ -42,20 +41,20 @@ async function signJWT(payload: Record<string, unknown>, secret: string, expires
 }
 
 export async function loginService(email: string, password: string) {
-  const hash = await hashPassword(password);
   const [employee] = await db
     .select()
     .from(employees)
     .where(eq(employees.email, email))
     .limit(1);
 
-  if (!employee || employee.passwordHash !== hash) {
+  const valid = employee ? await verifyPassword(password, employee.passwordHash) : false;
+  if (!valid) {
     throw Object.assign(new Error('Invalid credentials'), { status: 401 });
   }
 
   const token = await signJWT(
     { sub: employee.id, name: employee.name, role: employee.role, email: employee.email },
-    process.env.JWT_SECRET ?? 'secret'
+    process.env.JWT_SECRET!
   );
 
   return {
@@ -67,6 +66,7 @@ export async function loginService(email: string, password: string) {
       role: employee.role,
       department: employee.department,
       position: employee.position,
+      accessibleMenus: (() => { try { return employee.accessibleMenus ? JSON.parse(employee.accessibleMenus) : []; } catch { return []; } })(),
     },
   };
 }
@@ -85,7 +85,7 @@ export async function qrLoginService(qrToken: string) {
   // Issue 30-day JWT
   const token = await signJWT(
     { sub: employee.id, name: employee.name, role: employee.role, email: employee.email },
-    process.env.JWT_SECRET ?? 'secret',
+    process.env.JWT_SECRET!,
     30 * 24 * 60 * 60 // 30 days in seconds
   );
 
@@ -98,6 +98,7 @@ export async function qrLoginService(qrToken: string) {
       role: employee.role,
       department: employee.department,
       position: employee.position,
+      accessibleMenus: (() => { try { return employee.accessibleMenus ? JSON.parse(employee.accessibleMenus) : []; } catch { return []; } })(),
     },
   };
 }

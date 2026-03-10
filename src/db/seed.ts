@@ -3,12 +3,7 @@ import { employees, workLocations, companySettings } from './schema';
 import { eq, isNull } from 'drizzle-orm';
 
 async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  return Bun.password.hash(password);
 }
 
 async function seed() {
@@ -102,12 +97,7 @@ async function seed() {
   console.log(`Updated QR tokens for ${empsWithoutQR.length} employees`);
 
   console.log('Seed complete');
-  console.log('');
-  console.log('Test accounts:');
-  console.log('  Admin:    admin@repair-hub.local / admin1234');
-  console.log('  Manager:  manager@repair-hub.local / admin1234');
-  console.log('  Employee: somchai@repair-hub.local / emp1234');
-  console.log('  Employee: wisawa@repair-hub.local / emp1234');
+  console.log('Test accounts created — see .env.example for credentials');
 
   process.exit(0);
 }

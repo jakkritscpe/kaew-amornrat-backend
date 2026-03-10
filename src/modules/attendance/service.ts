@@ -1,4 +1,4 @@
-import { eq, and, type SQL } from 'drizzle-orm';
+import { eq, and, desc, count, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { attendanceLogs, employees } from '../../db/schema';
 import { isWithinRadius, calculateDistance } from '../../shared/utils/geo';
@@ -10,28 +10,43 @@ import { createEvent } from '../../shared/ws/events';
 
 export async function getLogs(filter: {
   employeeId?: string; date?: string; startDate?: string; endDate?: string; status?: string;
+  page?: number; limit?: number;
 }) {
+  const page = filter.page ?? 1;
+  const limit = filter.limit ?? 50;
+  const offset = (page - 1) * limit;
+
   const conditions: SQL[] = [];
   if (filter.employeeId) conditions.push(eq(attendanceLogs.employeeId, filter.employeeId));
   if (filter.date) conditions.push(eq(attendanceLogs.date, filter.date));
   if (filter.status) conditions.push(eq(attendanceLogs.status, filter.status as 'present' | 'late' | 'absent' | 'on_leave'));
 
-  const rows = await db
-    .select({
-      log: attendanceLogs,
-      employeeName: employees.name,
-      employeeDepartment: employees.department,
-    })
-    .from(attendanceLogs)
-    .leftJoin(employees, eq(attendanceLogs.employeeId, employees.id))
-    .where(conditions.length ? and(...conditions) : undefined)
-    .orderBy(attendanceLogs.date);
+  const where = conditions.length ? and(...conditions) : undefined;
 
-  return rows.map(({ log, employeeName, employeeDepartment }) => ({
-    ...log,
-    employeeName,
-    employeeDepartment,
-  }));
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({
+        log: attendanceLogs,
+        employeeName: employees.name,
+        employeeDepartment: employees.department,
+      })
+      .from(attendanceLogs)
+      .leftJoin(employees, eq(attendanceLogs.employeeId, employees.id))
+      .where(where)
+      .orderBy(desc(attendanceLogs.date))
+      .limit(limit)
+      .offset(offset),
+    db.select({ total: count() }).from(attendanceLogs).where(where),
+  ]);
+
+  return {
+    data: rows.map(({ log, employeeName, employeeDepartment }) => ({
+      ...log,
+      employeeName,
+      employeeDepartment,
+    })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 }
 
 export async function getTodayLog(employeeId: string) {

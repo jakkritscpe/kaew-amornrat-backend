@@ -1,38 +1,55 @@
-import { eq, ilike, and, type SQL } from 'drizzle-orm';
+import { eq, ilike, and, count, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { employees } from '../../db/schema';
 import { hashPassword } from '../auth/service';
 
-export async function listEmployees(filter: { department?: string; role?: string; search?: string }) {
+function parseAccessibleMenus(raw: string | null): string[] {
+  try { return raw ? JSON.parse(raw) : []; } catch { return []; }
+}
+
+export async function listEmployees(filter: {
+  department?: string; role?: string; search?: string; page?: number; limit?: number;
+}) {
+  const page = filter.page ?? 1;
+  const limit = filter.limit ?? 50;
+  const offset = (page - 1) * limit;
+
   const conditions: SQL[] = [];
   if (filter.department) conditions.push(eq(employees.department, filter.department));
   if (filter.role) conditions.push(eq(employees.role, filter.role as 'admin' | 'manager' | 'employee'));
   if (filter.search) conditions.push(ilike(employees.name, `%${filter.search}%`));
 
-  const rows = await db
-    .select({
-      id: employees.id,
-      name: employees.name,
-      nickname: employees.nickname,
-      email: employees.email,
-      department: employees.department,
-      position: employees.position,
-      role: employees.role,
-      shiftStartTime: employees.shiftStartTime,
-      shiftEndTime: employees.shiftEndTime,
-      locationId: employees.locationId,
-      baseWage: employees.baseWage,
-      otRateUseDefault: employees.otRateUseDefault,
-      otRateType: employees.otRateType,
-      otRateValue: employees.otRateValue,
-      avatarUrl: employees.avatarUrl,
-      qrToken: employees.qrToken,
-      createdAt: employees.createdAt,
-    })
-    .from(employees)
-    .where(conditions.length ? and(...conditions) : undefined);
+  const where = conditions.length ? and(...conditions) : undefined;
+  const selectedFields = {
+    id: employees.id,
+    name: employees.name,
+    nickname: employees.nickname,
+    email: employees.email,
+    department: employees.department,
+    position: employees.position,
+    role: employees.role,
+    shiftStartTime: employees.shiftStartTime,
+    shiftEndTime: employees.shiftEndTime,
+    locationId: employees.locationId,
+    baseWage: employees.baseWage,
+    otRateUseDefault: employees.otRateUseDefault,
+    otRateType: employees.otRateType,
+    otRateValue: employees.otRateValue,
+    avatarUrl: employees.avatarUrl,
+    qrToken: employees.qrToken,
+    accessibleMenus: employees.accessibleMenus,
+    createdAt: employees.createdAt,
+  };
 
-  return rows;
+  const [rows, [{ total }]] = await Promise.all([
+    db.select(selectedFields).from(employees).where(where).limit(limit).offset(offset),
+    db.select({ total: count() }).from(employees).where(where),
+  ]);
+
+  return {
+    data: rows.map(row => ({ ...row, accessibleMenus: parseAccessibleMenus(row.accessibleMenus) })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 }
 
 export async function getEmployee(id: string) {
@@ -54,6 +71,7 @@ export async function getEmployee(id: string) {
       otRateValue: employees.otRateValue,
       avatarUrl: employees.avatarUrl,
       qrToken: employees.qrToken,
+      accessibleMenus: employees.accessibleMenus,
       createdAt: employees.createdAt,
     })
     .from(employees)
@@ -61,7 +79,7 @@ export async function getEmployee(id: string) {
     .limit(1);
 
   if (!row) throw Object.assign(new Error('Employee not found'), { status: 404 });
-  return row;
+  return { ...row, accessibleMenus: parseAccessibleMenus(row.accessibleMenus) };
 }
 
 export async function createEmployee(data: {
@@ -92,7 +110,7 @@ export async function updateEmployee(id: string, data: Partial<{
   department: string; position: string; role: 'admin' | 'manager' | 'employee';
   shiftStartTime: string; shiftEndTime: string; locationId?: string;
   baseWage?: number; otRateUseDefault: boolean; otRateType?: 'multiplier' | 'fixed';
-  otRateValue?: number; avatarUrl?: string;
+  otRateValue?: number; avatarUrl?: string; accessibleMenus?: string[];
 }>) {
   const updates: Record<string, unknown> = { ...data, updatedAt: new Date() };
   if (data.password) {
@@ -100,6 +118,7 @@ export async function updateEmployee(id: string, data: Partial<{
   }
   delete updates.password;
   if (data.baseWage !== undefined) updates.baseWage = data.baseWage?.toString();
+  if ('accessibleMenus' in data) updates.accessibleMenus = JSON.stringify(data.accessibleMenus);
 
   await db.update(employees).set(updates).where(eq(employees.id, id));
   return getEmployee(id);
