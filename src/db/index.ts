@@ -8,6 +8,9 @@ if (!connectionString) {
   throw new Error('DATABASE_URL environment variable is required');
 }
 
-const client = postgres(connectionString);
+const client = postgres(connectionString, {
+  ssl: connectionString.includes('supabase') || connectionString.includes('render') ? 'require' : false,
+  max: 10,
+});
 export const db = drizzle(client, { schema });
 export type DB = typeof db;
