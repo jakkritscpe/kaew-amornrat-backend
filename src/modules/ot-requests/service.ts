@@ -36,7 +36,7 @@ export async function listOTRequests(filter: { status?: string; employeeId?: str
 export async function submitOTRequest(employeeId: string, data: {
   date: string; startTime: string; endTime: string; reason: string;
 }) {
-  const id = `ot_${Date.now()}`;
+  const id = `ot_${crypto.randomUUID()}`;
   await db.insert(otRequests).values({ id, employeeId, status: 'pending', ...data });
   const [row] = await db.select().from(otRequests).where(eq(otRequests.id, id)).limit(1);
 

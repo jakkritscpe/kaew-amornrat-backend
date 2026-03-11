@@ -11,3 +11,6 @@ export const LAT_MIN = -90;
 export const LAT_MAX = 90;
 export const LNG_MIN = -180;
 export const LNG_MAX = 180;
+
+/** Maximum allowed OT rate value (covers multiplier ≤10× and fixed-rate cap) */
+export const MAX_OT_RATE = 10;

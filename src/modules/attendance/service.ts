@@ -2,7 +2,7 @@ import { eq, and, desc, count, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { attendanceLogs, employees } from '../../db/schema';
 import { isWithinRadius, calculateDistance } from '../../shared/utils/geo';
-import { calculateWorkHours, calculateOTHours, isLate, todayDate, timeToMinutes } from '../../shared/utils/time';
+import { calculateWorkHours, calculateOTHours, isLate, minutesLate, todayDate } from '../../shared/utils/time';
 import { getEmployee } from '../employees/service';
 import { listLocations } from '../locations/service';
 import { wsManager } from '../../shared/ws/manager';
@@ -90,15 +90,9 @@ export async function checkIn(employeeId: string, lat: number, lng: number) {
   const now = new Date().toISOString();
   const late = isLate(employee.shiftStartTime, now);
   const status = late ? 'late' : 'present';
-  const id = `log_${Date.now()}`;
+  const id = `log_${crypto.randomUUID()}`;
 
-  const checkInDate = new Date(now);
-  const minutesLate = late
-    ? Math.round(
-        (checkInDate.getHours() * 60 + checkInDate.getMinutes()) -
-        timeToMinutes(employee.shiftStartTime)
-      )
-    : 0;
+  const lateMinutes = late ? Math.round(minutesLate(employee.shiftStartTime, now)) : 0;
 
   if (existing) {
     await db.update(attendanceLogs)
@@ -108,7 +102,7 @@ export async function checkIn(employeeId: string, lat: number, lng: number) {
       late ? 'LATE' : 'CHECK_IN',
       employeeId,
       employee.name,
-      { locationName: locationId ?? 'ไม่ระบุ', time: now, minutesLate }
+      { locationName: locationId ?? 'ไม่ระบุ', time: now, minutesLate: lateMinutes }
     ));
     return getTodayLog(employeeId);
   }
@@ -125,7 +119,7 @@ export async function checkIn(employeeId: string, lat: number, lng: number) {
     late ? 'LATE' : 'CHECK_IN',
     employeeId,
     employee.name,
-    { locationName: locationId ?? 'ไม่ระบุ', time: now, minutesLate }
+    { locationName: locationId ?? 'ไม่ระบุ', time: now, minutesLate: lateMinutes }
   ));
 
   return getTodayLog(employeeId);

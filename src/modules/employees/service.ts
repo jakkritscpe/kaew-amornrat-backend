@@ -89,7 +89,7 @@ export async function createEmployee(data: {
   baseWage?: number; otRateUseDefault: boolean; otRateType?: 'multiplier' | 'fixed';
   otRateValue?: number; avatarUrl?: string;
 }) {
-  const id = `emp_${Date.now()}`;
+  const id = `emp_${crypto.randomUUID()}`;
   const passwordHash = await hashPassword(data.password);
   const qrToken = crypto.randomUUID();
   const { password: _, ...rest } = data;

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_OT_RATE } from '../../shared/config';
 
 export const createEmployeeSchema = z.object({
   name: z.string().min(1),
@@ -14,7 +15,7 @@ export const createEmployeeSchema = z.object({
   baseWage: z.number().positive().optional(),
   otRateUseDefault: z.boolean().default(true),
   otRateType: z.enum(['multiplier', 'fixed']).optional(),
-  otRateValue: z.number().positive().optional(),
+  otRateValue: z.number().positive().max(MAX_OT_RATE).optional(),
   avatarUrl: z.string().optional(),
 });
 

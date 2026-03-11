@@ -9,6 +9,11 @@ for (const key of requiredEnv) {
   }
 }
 
+if (process.env.JWT_SECRET!.length < 32) {
+  console.error('[startup] JWT_SECRET must be at least 32 characters long');
+  process.exit(1);
+}
+
 const app = createApp();
 const port = Number(process.env.PORT) || 3000;
 
@@ -18,4 +23,13 @@ const server = Bun.serve({
   websocket,
 });
 
-console.log(`🚀 Server running on http://localhost:${port}`);
+console.log(`[startup] Server running on port ${port}`);
+
+async function shutdown(signal: string) {
+  console.log(`[shutdown] Received ${signal}, stopping server...`);
+  await server.stop(true);
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
