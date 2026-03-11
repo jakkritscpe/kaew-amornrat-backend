@@ -1,6 +1,10 @@
+import dns from 'dns';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
+
+// Force IPv4 to avoid ECONNREFUSED on IPv6 (Render → Supabase)
+dns.setDefaultResultOrder('ipv4first');
 
 const connectionString = process.env.DATABASE_URL;
 
