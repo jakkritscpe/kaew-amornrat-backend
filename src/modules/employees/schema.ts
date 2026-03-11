@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { MAX_OT_RATE } from '../../shared/config';
 
 export const createEmployeeSchema = z.object({
   name: z.string().min(1),
@@ -15,7 +14,9 @@ export const createEmployeeSchema = z.object({
   baseWage: z.number().positive().optional(),
   otRateUseDefault: z.boolean().default(true),
   otRateType: z.enum(['multiplier', 'fixed']).optional(),
-  otRateValue: z.number().positive().max(MAX_OT_RATE).optional(),
+  // No upper cap here — multiplier (e.g. 1.5×) and fixed-rate (e.g. 500 ฿/hr) use
+  // very different scales. A shared cap of MAX_OT_RATE=10 falsely rejects fixed rates.
+  otRateValue: z.number().positive().optional(),
   avatarUrl: z.string().optional(),
 });
 
