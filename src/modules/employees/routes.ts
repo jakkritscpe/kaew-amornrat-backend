@@ -32,7 +32,7 @@ employeesRouter.post('/', guardRole('admin'), zValidator('json', createEmployeeS
   return c.json(ok(data, 'Employee created'), 201);
 });
 
-employeesRouter.put('/:id', guardRole('admin'), zValidator('json', updateEmployeeSchema), async (c) => {
+employeesRouter.put('/:id', guardRole('admin', 'manager'), zValidator('json', updateEmployeeSchema), async (c) => {
   const body = c.req.valid('json');
   const data = await updateEmployee(c.req.param('id'), body);
   return c.json(ok(data, 'Employee updated'));
