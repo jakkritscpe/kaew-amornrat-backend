@@ -12,17 +12,17 @@ const qrInfoRateLimit = rateLimit(20, 5 * 60 * 1000);
 // 10 check-in/out actions per 15 min per IP
 const qrActionRateLimit = rateLimit(10, 15 * 60 * 1000);
 
-qrRouter.get('/:employeeId', qrInfoRateLimit, async (c) => {
-  return c.json(ok(await getEmployeePublicInfo(c.req.param('employeeId'))));
+qrRouter.get('/:qrToken', qrInfoRateLimit, async (c) => {
+  return c.json(ok(await getEmployeePublicInfo(c.req.param('qrToken'))));
 });
 
 qrRouter.post(
-  '/:employeeId',
+  '/:qrToken',
   qrActionRateLimit,
   zValidator('json', qrCheckInBodySchema),
   async (c) => {
     const { lat, lng } = c.req.valid('json');
-    const result = await qrCheckIn(c.req.param('employeeId'), lat, lng);
+    const result = await qrCheckIn(c.req.param('qrToken'), lat, lng);
     return c.json(ok(result, result.action === 'check-in' ? 'Check-in สำเร็จ' : 'Check-out สำเร็จ'));
   }
 );

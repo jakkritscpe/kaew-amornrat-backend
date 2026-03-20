@@ -15,7 +15,7 @@ mock.module('../../db', () => ({
 }));
 
 mock.module('../../db/schema', () => ({
-  employees: { id: 'id', name: 'name', position: 'position', avatarUrl: 'avatar_url' },
+  employees: { id: 'id', name: 'name', position: 'position', avatarUrl: 'avatar_url', qrToken: 'qr_token' },
 }));
 
 // Mock the attendance service that qr-checkin depends on
@@ -55,17 +55,17 @@ function setupSelectReturn(value: unknown) {
 describe('getEmployeePublicInfo', () => {
   beforeEach(resetMocks);
 
-  test('returns public info when found', async () => {
+  test('returns public info when found by qrToken', async () => {
     setupSelectReturn([{ id: 'emp_001', name: 'สมชาย', position: 'Dev', avatarUrl: null }]);
-    const result = await getEmployeePublicInfo('emp_001');
+    const result = await getEmployeePublicInfo('some-uuid-token');
     expect(result.id).toBe('emp_001');
     expect(result.name).toBe('สมชาย');
   });
 
-  test('throws 404 when not found', async () => {
+  test('throws 404 when qrToken not found', async () => {
     setupSelectReturn([]);
     try {
-      await getEmployeePublicInfo('emp_999');
+      await getEmployeePublicInfo('invalid-token');
       expect(true).toBe(false);
     } catch (err: any) {
       expect(err.message).toBe('Employee not found');
@@ -78,27 +78,30 @@ describe('qrCheckIn', () => {
   beforeEach(resetMocks);
 
   test('check-in when no existing log', async () => {
+    setupSelectReturn([{ id: 'emp_001' }]);
     mockGetTodayLog.mockResolvedValue(null);
-    const result = await qrCheckIn('emp_001', 13.7563, 100.5018);
+    const result = await qrCheckIn('some-uuid-token', 13.7563, 100.5018);
     expect(result.action).toBe('check-in');
     expect(mockCheckIn).toHaveBeenCalledWith('emp_001', 13.7563, 100.5018);
   });
 
   test('check-out when already checked in but not out', async () => {
+    setupSelectReturn([{ id: 'emp_001' }]);
     mockGetTodayLog.mockResolvedValue({
       id: 'log_001', checkInTime: new Date(), checkOutTime: null,
     } as any);
-    const result = await qrCheckIn('emp_001', 13.7563, 100.5018);
+    const result = await qrCheckIn('some-uuid-token', 13.7563, 100.5018);
     expect(result.action).toBe('check-out');
     expect(mockCheckOut).toHaveBeenCalledWith('emp_001', 13.7563, 100.5018);
   });
 
   test('check-in when already fully checked in/out (new day)', async () => {
+    setupSelectReturn([{ id: 'emp_001' }]);
     mockGetTodayLog.mockResolvedValue({
       id: 'log_001', checkInTime: new Date(), checkOutTime: new Date(),
     } as any);
     // When both checkInTime and checkOutTime exist, condition `checkInTime && !checkOutTime` is false
-    const result = await qrCheckIn('emp_001', 13.7563, 100.5018);
+    const result = await qrCheckIn('some-uuid-token', 13.7563, 100.5018);
     expect(result.action).toBe('check-in');
     expect(mockCheckIn).toHaveBeenCalled();
   });
