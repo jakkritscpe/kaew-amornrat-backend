@@ -1,4 +1,4 @@
-import { eq, and, desc, count, type SQL } from 'drizzle-orm';
+import { eq, and, desc, count, gte, lte, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { attendanceLogs, employees } from '../../db/schema';
 import { isWithinRadius, calculateDistance } from '../../shared/utils/geo';
@@ -19,6 +19,8 @@ export async function getLogs(filter: {
   const conditions: SQL[] = [];
   if (filter.employeeId) conditions.push(eq(attendanceLogs.employeeId, filter.employeeId));
   if (filter.date) conditions.push(eq(attendanceLogs.date, filter.date));
+  if (filter.startDate) conditions.push(gte(attendanceLogs.date, filter.startDate));
+  if (filter.endDate) conditions.push(lte(attendanceLogs.date, filter.endDate));
   if (filter.status) conditions.push(eq(attendanceLogs.status, filter.status as 'present' | 'late' | 'absent' | 'on_leave'));
 
   const where = conditions.length ? and(...conditions) : undefined;

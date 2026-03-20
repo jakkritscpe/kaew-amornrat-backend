@@ -24,6 +24,10 @@ export const updateEmployeeSchema = createEmployeeSchema.partial().omit({ passwo
   password: z.string().min(6).optional(),
 });
 
+export const updateMenusSchema = z.object({
+  accessibleMenus: z.array(z.string()),
+});
+
 export const listEmployeesSchema = z.object({
   department: z.string().optional(),
   role: z.enum(['admin', 'manager', 'employee']).optional(),

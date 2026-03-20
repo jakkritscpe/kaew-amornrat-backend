@@ -22,9 +22,14 @@ setInterval(() => {
  */
 export function rateLimit(max: number, window: number) {
   return async (c: Context, next: Next) => {
+    // Prefer cf-connecting-ip (set by Cloudflare, trusted) over x-forwarded-for.
+    // For x-forwarded-for, take the LAST entry (closest proxy / most likely real client
+    // when behind a single trusted reverse proxy) to reduce spoofing risk.
+    const xff = c.req.header('x-forwarded-for');
+    const xffIp = xff ? xff.split(',').pop()!.trim() : undefined;
     const ip =
-      c.req.header('x-forwarded-for')?.split(',')[0].trim() ??
       c.req.header('cf-connecting-ip') ??
+      xffIp ??
       'unknown';
 
     const now = Date.now();

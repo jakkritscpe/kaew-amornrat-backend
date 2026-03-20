@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware, guardRole } from '../../shared/middleware/auth';
 import { ok } from '../../shared/utils/response';
-import { createEmployeeSchema, updateEmployeeSchema, listEmployeesSchema } from './schema';
+import { createEmployeeSchema, updateEmployeeSchema, listEmployeesSchema, updateMenusSchema } from './schema';
 import { listEmployees, getEmployee, createEmployee, updateEmployee, removeEmployee } from './service';
 
 const employeesRouter = new Hono();
@@ -15,9 +15,9 @@ employeesRouter.get('/', guardRole('admin', 'manager'), zValidator('query', list
 });
 
 // PUT /api/employees/:id/menus (admin only - update accessible menus)
-employeesRouter.put('/:id/menus', guardRole('admin'), async (c) => {
-  const body = await c.req.json() as { accessibleMenus: string[] };
-  const data = await updateEmployee(c.req.param('id'), { accessibleMenus: body.accessibleMenus } as any);
+employeesRouter.put('/:id/menus', guardRole('admin'), zValidator('json', updateMenusSchema), async (c) => {
+  const { accessibleMenus } = c.req.valid('json');
+  const data = await updateEmployee(c.req.param('id'), { accessibleMenus });
   return c.json(ok(data, 'Menus updated'));
 });
 
@@ -58,7 +58,7 @@ employeesRouter.get('/:id/qr-token', guardRole('admin', 'manager'), async (c) =>
 // POST /api/employees/:id/regenerate-qr (admin only - revoke and regenerate)
 employeesRouter.post('/:id/regenerate-qr', guardRole('admin'), async (c) => {
   const newToken = crypto.randomUUID();
-  await updateEmployee(c.req.param('id'), { qrToken: newToken } as any);
+  await updateEmployee(c.req.param('id'), { qrToken: newToken });
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
   return c.json(ok({
     qrUrl: `${frontendUrl}/employee/qr-login/${newToken}`,

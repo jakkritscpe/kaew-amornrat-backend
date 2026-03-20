@@ -111,6 +111,7 @@ export async function updateEmployee(id: string, data: Partial<{
   shiftStartTime: string; shiftEndTime: string; locationId?: string;
   baseWage?: number; otRateUseDefault: boolean; otRateType?: 'multiplier' | 'fixed';
   otRateValue?: number; avatarUrl?: string; accessibleMenus?: string[];
+  qrToken?: string;
 }>) {
   const updates: Record<string, unknown> = { ...data, updatedAt: new Date() };
   if (data.password) {
