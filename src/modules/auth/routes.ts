@@ -17,13 +17,17 @@ const auth = new Hono();
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 /** Set the auth HttpOnly cookie — keeps JWTs out of localStorage (XSS mitigation).
- *  SameSite=Lax: blocks cross-site form CSRF while allowing same-site navigations and
- *  direct API calls (frontend subdomain shares eTLD+1 with backend). */
+ *  Production: SameSite=None; Secure — required when frontend and backend are on different
+ *  domains (e.g. separate onrender.com subdomains). CSRF is mitigated by:
+ *    1. All mutation endpoints require Content-Type: application/json (zValidator) so
+ *       HTML form submissions (which use form-encoded content-type) are rejected.
+ *    2. CORS origin whitelist prevents unauthorised cross-origin fetch with credentials.
+ *  Development: SameSite=Lax — frontend and backend share the same localhost origin. */
 function setAuthCookie(c: Parameters<typeof setCookie>[0], token: string, maxAgeSeconds: number) {
   setCookie(c, 'auth_token', token, {
     httpOnly: true,
     path: '/',
-    sameSite: 'Lax',
+    sameSite: IS_PROD ? 'None' : 'Lax',
     secure: IS_PROD,
     maxAge: maxAgeSeconds,
   });
@@ -60,7 +64,7 @@ auth.get('/me', authMiddleware, async (c) => {
 
 // POST /api/auth/logout
 auth.post('/logout', (c) => {
-  deleteCookie(c, 'auth_token', { path: '/', sameSite: 'Lax', secure: IS_PROD });
+  deleteCookie(c, 'auth_token', { path: '/', sameSite: IS_PROD ? 'None' : 'Lax', secure: IS_PROD });
   return c.json(ok(null, 'Logged out'));
 });
 
