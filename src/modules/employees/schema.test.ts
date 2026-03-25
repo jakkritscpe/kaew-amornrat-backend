@@ -102,7 +102,7 @@ describe('listEmployeesSchema', () => {
     expect(listEmployeesSchema.safeParse({ role: 'superadmin' }).success).toBe(false);
   });
 
-  test('limit max 200', () => {
-    expect(listEmployeesSchema.safeParse({ limit: '201' }).success).toBe(false);
+  test('limit max 1000', () => {
+    expect(listEmployeesSchema.safeParse({ limit: '1001' }).success).toBe(false);
   });
 });

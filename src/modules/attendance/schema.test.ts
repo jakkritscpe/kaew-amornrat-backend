@@ -80,9 +80,9 @@ describe('listLogsSchema', () => {
     expect(listLogsSchema.safeParse({ status: 'invalid' }).success).toBe(false);
   });
 
-  test('limit max 200', () => {
-    expect(listLogsSchema.safeParse({ limit: '201' }).success).toBe(false);
-    expect(listLogsSchema.safeParse({ limit: '200' }).success).toBe(true);
+  test('limit max 1000', () => {
+    expect(listLogsSchema.safeParse({ limit: '1001' }).success).toBe(false);
+    expect(listLogsSchema.safeParse({ limit: '1000' }).success).toBe(true);
   });
 
   test('page must be positive', () => {

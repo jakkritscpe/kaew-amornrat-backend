@@ -16,7 +16,7 @@ export const listLogsSchema = z.object({
   endDate: z.string().optional(),
   status: z.enum(['present', 'late', 'absent', 'on_leave']).optional(),
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(1000).default(50),
 });
 
 export const updateLogSchema = z.object({
