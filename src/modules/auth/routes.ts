@@ -1,14 +1,33 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { setCookie, deleteCookie } from 'hono/cookie';
+import { eq } from 'drizzle-orm';
 import { loginSchema } from './schema';
 import { loginService, qrLoginService } from './service';
 import { authMiddleware } from '../../shared/middleware/auth';
 import { rateLimit } from '../../shared/middleware/rate-limit';
-import { ok, fail } from '../../shared/utils/response';
+import { ok } from '../../shared/utils/response';
+import { db } from '../../db';
+import { employees } from '../../db/schema';
 import type { JWTPayload } from '../../shared/types';
 
 const auth = new Hono();
+
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+/** Set the auth HttpOnly cookie — keeps JWTs out of localStorage (XSS mitigation).
+ *  SameSite=Lax: blocks cross-site form CSRF while allowing same-site navigations and
+ *  direct API calls (frontend subdomain shares eTLD+1 with backend). */
+function setAuthCookie(c: Parameters<typeof setCookie>[0], token: string, maxAgeSeconds: number) {
+  setCookie(c, 'auth_token', token, {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'Lax',
+    secure: IS_PROD,
+    maxAge: maxAgeSeconds,
+  });
+}
 
 // 10 login attempts per 15 minutes per IP
 const loginRateLimit = rateLimit(10, 15 * 60 * 1000);
@@ -17,19 +36,39 @@ const loginRateLimit = rateLimit(10, 15 * 60 * 1000);
 auth.post('/login', loginRateLimit, zValidator('json', loginSchema), async (c) => {
   const { email, password } = c.req.valid('json');
   const result = await loginService(email, password);
+  setAuthCookie(c, result.token, 7 * 24 * 60 * 60); // 7 days
   return c.json(ok(result, 'Login successful'));
 });
 
-// GET /api/auth/me
-auth.get('/me', authMiddleware, (c) => {
+// GET /api/auth/me — returns full profile from DB (used to restore session on page refresh)
+auth.get('/me', authMiddleware, async (c) => {
   const payload = c.get('jwtPayload') as JWTPayload;
-  return c.json(ok(payload));
+  const [emp] = await db
+    .select({
+      id: employees.id, name: employees.name, email: employees.email, role: employees.role,
+      department: employees.department, position: employees.position, accessibleMenus: employees.accessibleMenus,
+    })
+    .from(employees).where(eq(employees.id, payload.sub)).limit(1);
+  if (!emp) return c.json({ success: false, error: 'User not found' }, 404);
+
+  return c.json(ok({
+    id: emp.id, name: emp.name, email: emp.email, role: emp.role,
+    department: emp.department, position: emp.position,
+    accessibleMenus: (() => { try { return emp.accessibleMenus ? JSON.parse(emp.accessibleMenus) : []; } catch { return []; } })(),
+  }));
+});
+
+// POST /api/auth/logout
+auth.post('/logout', (c) => {
+  deleteCookie(c, 'auth_token', { path: '/', sameSite: 'Lax', secure: IS_PROD });
+  return c.json(ok(null, 'Logged out'));
 });
 
 // POST /api/auth/qr-login
 auth.post('/qr-login', loginRateLimit, zValidator('json', z.object({ token: z.string() })), async (c) => {
   const { token } = c.req.valid('json');
   const result = await qrLoginService(token);
+  setAuthCookie(c, result.token, 30 * 24 * 60 * 60); // 30 days
   return c.json(ok(result, 'Login successful'));
 });
 

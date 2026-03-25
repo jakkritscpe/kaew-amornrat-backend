@@ -94,7 +94,7 @@ export const TEST_EMPLOYEE = {
 };
 
 export const TEST_MANAGER = {
-  sub: 'emp_mgr',
+  sub: 'emp_manager',
   name: 'Manager User',
   email: 'manager@test.com',
   role: 'manager' as const,

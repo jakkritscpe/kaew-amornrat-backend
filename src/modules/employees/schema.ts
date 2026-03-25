@@ -1,15 +1,15 @@
 import { z } from 'zod';
 
 export const createEmployeeSchema = z.object({
-  name: z.string().min(1),
-  nickname: z.string().optional(),
-  email: z.string().email(),
-  password: z.string().min(6),
-  department: z.string().min(1),
-  position: z.string().min(1),
+  name: z.string().min(1).max(255),
+  nickname: z.string().max(100).optional(),
+  email: z.string().email().max(255),
+  password: z.string().min(8).max(128),
+  department: z.string().min(1).max(255),
+  position: z.string().min(1).max(255),
   role: z.enum(['admin', 'manager', 'employee']).default('employee'),
-  shiftStartTime: z.string().default('08:00:00'),
-  shiftEndTime: z.string().default('17:00:00'),
+  shiftStartTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'shiftStartTime must be HH:MM or HH:MM:SS').default('08:00:00'),
+  shiftEndTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'shiftEndTime must be HH:MM or HH:MM:SS').default('17:00:00'),
   locationId: z.string().optional(),
   baseWage: z.number().positive().optional(),
   otRateUseDefault: z.boolean().default(true),
@@ -21,11 +21,32 @@ export const createEmployeeSchema = z.object({
 });
 
 export const updateEmployeeSchema = createEmployeeSchema.partial().omit({ password: true }).extend({
-  password: z.string().min(6).optional(),
+  password: z.string().min(8).optional(),
 });
 
+const VALID_MENU_IDS = [
+  'attendance',
+  'attendance/dashboard',
+  'attendance/logs',
+  'attendance/employees',
+  'attendance/locations',
+  'attendance/ot-approvals',
+  'attendance/ot-calculator',
+  'attendance/reports',
+  'settings',
+] as const;
+
 export const updateMenusSchema = z.object({
-  accessibleMenus: z.array(z.string()),
+  accessibleMenus: z.array(z.enum(VALID_MENU_IDS)),
+});
+
+export const verifyPinSchema = z.object({
+  pin: z.string().length(4).regex(/^\d{4}$/),
+});
+
+export const setPinSchema = z.object({
+  pin: z.string().length(4).regex(/^\d{4}$/),
+  currentPin: z.string().length(4).regex(/^\d{4}$/).optional(),
 });
 
 export const listEmployeesSchema = z.object({

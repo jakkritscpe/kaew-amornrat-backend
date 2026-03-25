@@ -90,9 +90,10 @@ async function seed() {
   }).onConflictDoNothing();
 
   // Update qrTokens for employees that don't have one
+  const qrExpiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
   const empsWithoutQR = await db.select({ id: employees.id }).from(employees).where(isNull(employees.qrToken));
   for (const emp of empsWithoutQR) {
-    await db.update(employees).set({ qrToken: crypto.randomUUID() }).where(eq(employees.id, emp.id));
+    await db.update(employees).set({ qrToken: crypto.randomUUID(), qrTokenExpiresAt: qrExpiry }).where(eq(employees.id, emp.id));
   }
   console.log(`Updated QR tokens for ${empsWithoutQR.length} employees`);
 

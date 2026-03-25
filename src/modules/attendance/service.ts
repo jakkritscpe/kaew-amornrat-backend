@@ -1,12 +1,12 @@
-import { eq, and, desc, count, gte, lte, type SQL } from 'drizzle-orm';
+import { eq, and, desc, count, gte, lte, isNull, isNotNull, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
-import { attendanceLogs, employees } from '../../db/schema';
+import { attendanceLogs, employees, workLocations } from '../../db/schema';
 import { isWithinRadius, calculateDistance } from '../../shared/utils/geo';
 import { calculateWorkHours, calculateOTHours, isLate, minutesLate, todayDate } from '../../shared/utils/time';
 import { getEmployee } from '../employees/service';
-import { listLocations } from '../locations/service';
 import { wsManager } from '../../shared/ws/manager';
 import { createEvent } from '../../shared/ws/events';
+import { badRequest, notFound } from '../../shared/utils/errors';
 
 export async function getLogs(filter: {
   employeeId?: string; date?: string; startDate?: string; endDate?: string; status?: string;
@@ -16,14 +16,14 @@ export async function getLogs(filter: {
   const limit = filter.limit ?? 50;
   const offset = (page - 1) * limit;
 
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [isNull(employees.deletedAt)];
   if (filter.employeeId) conditions.push(eq(attendanceLogs.employeeId, filter.employeeId));
   if (filter.date) conditions.push(eq(attendanceLogs.date, filter.date));
   if (filter.startDate) conditions.push(gte(attendanceLogs.date, filter.startDate));
   if (filter.endDate) conditions.push(lte(attendanceLogs.date, filter.endDate));
   if (filter.status) conditions.push(eq(attendanceLogs.status, filter.status as 'present' | 'late' | 'absent' | 'on_leave'));
 
-  const where = conditions.length ? and(...conditions) : undefined;
+  const where = and(...conditions);
 
   const [rows, [{ total }]] = await Promise.all([
     db
@@ -38,7 +38,10 @@ export async function getLogs(filter: {
       .orderBy(desc(attendanceLogs.date))
       .limit(limit)
       .offset(offset),
-    db.select({ total: count() }).from(attendanceLogs).where(where),
+    db.select({ total: count() })
+      .from(attendanceLogs)
+      .leftJoin(employees, eq(attendanceLogs.employeeId, employees.id))
+      .where(where),
   ]);
 
   return {
@@ -68,25 +71,27 @@ export async function checkIn(employeeId: string, lat: number, lng: number) {
   // Check already checked in
   const existing = await getTodayLog(employeeId);
   if (existing?.checkInTime) {
-    throw Object.assign(new Error('Already checked in today'), { status: 400 });
+    throw badRequest('Already checked in today');
   }
 
-  // Geofence check
+  // Geofence check — direct single-row query instead of loading all locations
   let locationId: string | null = null;
   if (employee.locationId) {
-    const locations = await listLocations();
-    const loc = locations.find((l) => l.id === employee.locationId);
-    if (loc) {
-      const within = isWithinRadius(lat, lng, loc.lat, loc.lng, loc.radiusMeters);
-      if (!within) {
-        const dist = Math.round(calculateDistance(lat, lng, loc.lat, loc.lng));
-        throw Object.assign(
-          new Error(`นอกพื้นที่ (ระยะห่าง ${dist} เมตร, รัศมี ${loc.radiusMeters} เมตร)`),
-          { status: 400 }
-        );
-      }
-      locationId = loc.id;
+    const [loc] = await db
+      .select({ id: workLocations.id, lat: workLocations.lat, lng: workLocations.lng, radiusMeters: workLocations.radiusMeters })
+      .from(workLocations)
+      .where(and(eq(workLocations.id, employee.locationId), isNull(workLocations.deletedAt)))
+      .limit(1);
+    if (!loc) {
+      // Location was soft-deleted but employee still references it — block check-in
+      throw badRequest('สถานที่ทำงานที่กำหนดไว้ถูกลบแล้ว กรุณาติดต่อผู้ดูแลระบบ');
     }
+    const within = isWithinRadius(lat, lng, loc.lat, loc.lng, loc.radiusMeters);
+    if (!within) {
+      const dist = Math.round(calculateDistance(lat, lng, loc.lat, loc.lng));
+      throw badRequest(`อยู่นอกพื้นที่ที่กำหนด (ระยะห่าง ${dist} เมตร)`);
+    }
+    locationId = loc.id;
   }
 
   const now = new Date().toISOString();
@@ -109,13 +114,20 @@ export async function checkIn(employeeId: string, lat: number, lng: number) {
     return getTodayLog(employeeId);
   }
 
-  await db.insert(attendanceLogs).values({
-    id, employeeId, date: today,
-    checkInTime: new Date(now),
-    checkInLat: lat, checkInLng: lng,
-    status, locationId,
-    workHours: 0, otHours: 0,
-  });
+  try {
+    await db.insert(attendanceLogs).values({
+      id, employeeId, date: today,
+      checkInTime: new Date(now),
+      checkInLat: lat, checkInLng: lng,
+      status, locationId,
+      workHours: 0, otHours: 0,
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === '23505') {
+      throw badRequest('Already checked in today');
+    }
+    throw e;
+  }
 
   wsManager.broadcast(createEvent(
     late ? 'LATE' : 'CHECK_IN',
@@ -131,8 +143,8 @@ export async function checkOut(employeeId: string, lat: number, lng: number) {
   const employee = await getEmployee(employeeId);
   const log = await getTodayLog(employeeId);
 
-  if (!log?.checkInTime) throw Object.assign(new Error('ยังไม่ได้ check-in วันนี้'), { status: 400 });
-  if (log.checkOutTime) throw Object.assign(new Error('Check-out แล้ววันนี้'), { status: 400 });
+  if (!log?.checkInTime) throw badRequest('ยังไม่ได้ check-in วันนี้');
+  if (log.checkOutTime) throw badRequest('Check-out แล้ววันนี้');
 
   const now = new Date().toISOString();
   const workHours = calculateWorkHours(log.checkInTime.toISOString(), now);
@@ -162,8 +174,31 @@ export async function updateLog(id: string, data: Partial<{
   status: 'present' | 'late' | 'absent' | 'on_leave';
   workHours: number; otHours: number;
 }>) {
+  const [existing] = await db
+    .select({ id: attendanceLogs.id, employeeId: attendanceLogs.employeeId, checkInTime: attendanceLogs.checkInTime, checkOutTime: attendanceLogs.checkOutTime })
+    .from(attendanceLogs).where(eq(attendanceLogs.id, id)).limit(1);
+  if (!existing) throw notFound('Attendance log not found');
+
   const updates: Record<string, unknown> = { ...data, updatedAt: new Date() };
   if (data.checkInTime) updates.checkInTime = new Date(data.checkInTime);
   if (data.checkOutTime) updates.checkOutTime = new Date(data.checkOutTime);
+
+  // Recalculate workHours and otHours if any time was changed
+  if (data.checkInTime || data.checkOutTime) {
+    const newCheckIn = (updates.checkInTime as Date | undefined) ?? existing.checkInTime;
+    const newCheckOut = (updates.checkOutTime as Date | undefined) ?? existing.checkOutTime;
+    if (newCheckIn && newCheckOut) {
+      const [emp] = await db
+        .select({ shiftStartTime: employees.shiftStartTime, shiftEndTime: employees.shiftEndTime })
+        .from(employees).where(eq(employees.id, existing.employeeId)).limit(1);
+      if (emp) {
+        updates.workHours = calculateWorkHours(newCheckIn.toISOString(), newCheckOut.toISOString());
+        updates.otHours = calculateOTHours(updates.workHours as number, emp.shiftStartTime, emp.shiftEndTime);
+      }
+    }
+  }
+
   await db.update(attendanceLogs).set(updates).where(eq(attendanceLogs.id, id));
+  const [updated] = await db.select().from(attendanceLogs).where(eq(attendanceLogs.id, id)).limit(1);
+  return updated;
 }

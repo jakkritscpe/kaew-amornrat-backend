@@ -1,4 +1,8 @@
 import type { Context, Next } from 'hono';
+import { getCookie } from 'hono/cookie';
+import { eq, isNull, and } from 'drizzle-orm';
+import { db } from '../../db';
+import { employees } from '../../db/schema';
 import { fail } from '../utils/response';
 import type { JWTPayload } from '../types';
 
@@ -37,13 +41,21 @@ export async function verifyJWT(token: string, secret: string): Promise<JWTPaylo
 }
 
 export async function authMiddleware(c: Context, next: Next) {
+  // Prefer HttpOnly cookie (XSS-safe); fall back to Authorization header for backward-compat
+  const cookieToken = getCookie(c, 'auth_token');
   const authorization = c.req.header('Authorization');
-  if (!authorization?.startsWith('Bearer ')) {
+  const token = cookieToken ?? (authorization?.startsWith('Bearer ') ? authorization.slice(7) : null);
+  if (!token) {
     return c.json(fail('Unauthorized'), 401);
   }
-  const token = authorization.slice(7);
   try {
     const payload = await verifyJWT(token, process.env.JWT_SECRET!);
+    const [active] = await db
+      .select({ id: employees.id })
+      .from(employees)
+      .where(and(eq(employees.id, payload.sub), isNull(employees.deletedAt)))
+      .limit(1);
+    if (!active) return c.json(fail('บัญชีนี้ถูกปิดใช้งาน'), 401);
     c.set('jwtPayload', payload);
     await next();
   } catch {

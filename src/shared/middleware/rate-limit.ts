@@ -5,6 +5,16 @@ interface Entry {
   resetAt: number;
 }
 
+/**
+ * In-memory rate limit store.
+ *
+ * ⚠️  SINGLE-INSTANCE ONLY — if the app scales to multiple instances (e.g.
+ *     Render auto-scaling) this store is NOT shared across processes.
+ *     To support multi-instance, replace with a Redis-backed implementation:
+ *       - upstash/ratelimit (serverless-friendly, works on Render)
+ *       - ioredis sliding-window counter
+ *     The rateLimit() middleware API does not need to change — just swap the store.
+ */
 const store = new Map<string, Entry>();
 
 // Periodically clear expired entries to avoid memory growth
@@ -14,6 +24,14 @@ setInterval(() => {
     if (entry.resetAt < now) store.delete(key);
   }
 }, 60_000);
+
+/**
+ * Clear all rate limit counters. Useful in development and integration tests
+ * when the backend is not restarted between test runs.
+ */
+export function clearRateLimitStore() {
+  store.clear();
+}
 
 /**
  * Simple in-memory sliding-window rate limiter.

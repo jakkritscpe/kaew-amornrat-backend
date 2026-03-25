@@ -1,4 +1,5 @@
-import { eq, and, count, desc, type SQL } from 'drizzle-orm';
+import { eq, and, count, desc, isNull, type SQL } from 'drizzle-orm';
+import { notFound } from '../../shared/utils/errors';
 import { db } from '../../db';
 import { otRequests, employees } from '../../db/schema';
 import { wsManager } from '../../shared/ws/manager';
@@ -9,11 +10,11 @@ export async function listOTRequests(filter: { status?: string; employeeId?: str
   const limit = filter.limit ?? 50;
   const offset = (page - 1) * limit;
 
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [isNull(employees.deletedAt)];
   if (filter.status) conditions.push(eq(otRequests.status, filter.status as 'pending' | 'approved' | 'rejected'));
   if (filter.employeeId) conditions.push(eq(otRequests.employeeId, filter.employeeId));
 
-  const where = conditions.length ? and(...conditions) : undefined;
+  const where = and(...conditions);
 
   const [rows, [{ total }]] = await Promise.all([
     db
@@ -24,7 +25,10 @@ export async function listOTRequests(filter: { status?: string; employeeId?: str
       .orderBy(desc(otRequests.createdAt))
       .limit(limit)
       .offset(offset),
-    db.select({ total: count() }).from(otRequests).where(where),
+    db.select({ total: count() })
+      .from(otRequests)
+      .leftJoin(employees, eq(otRequests.employeeId, employees.id))
+      .where(where),
   ]);
 
   return {
@@ -51,16 +55,19 @@ export async function submitOTRequest(employeeId: string, data: {
 }
 
 export async function updateOTStatus(id: string, status: 'approved' | 'rejected') {
+  const [otReq] = await db.select({ employeeId: otRequests.employeeId }).from(otRequests).where(eq(otRequests.id, id)).limit(1);
+  if (!otReq) throw notFound('OT request not found');
+
   await db.update(otRequests).set({ status, updatedAt: new Date() }).where(eq(otRequests.id, id));
 
-  const [otReq] = await db.select({ employeeId: otRequests.employeeId }).from(otRequests).where(eq(otRequests.id, id)).limit(1);
-  if (otReq) {
-    const [emp] = await db.select({ name: employees.name }).from(employees).where(eq(employees.id, otReq.employeeId)).limit(1);
-    wsManager.broadcast(createEvent(
-      status === 'approved' ? 'OT_APPROVED' : 'OT_REJECTED',
-      otReq.employeeId,
-      emp?.name ?? otReq.employeeId,
-      { status }
-    ));
-  }
+  const [emp] = await db.select({ name: employees.name }).from(employees).where(eq(employees.id, otReq.employeeId)).limit(1);
+  wsManager.broadcast(createEvent(
+    status === 'approved' ? 'OT_APPROVED' : 'OT_REJECTED',
+    otReq.employeeId,
+    emp?.name ?? otReq.employeeId,
+    { status }
+  ));
+
+  const [updated] = await db.select().from(otRequests).where(eq(otRequests.id, id)).limit(1);
+  return updated;
 }

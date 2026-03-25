@@ -75,9 +75,9 @@ describe('updateEmployeeSchema', () => {
     expect(updateEmployeeSchema.safeParse({ name: 'New Name' }).success).toBe(true);
   });
 
-  test('password optional but min 6', () => {
-    expect(updateEmployeeSchema.safeParse({ password: '12345' }).success).toBe(false);
-    expect(updateEmployeeSchema.safeParse({ password: '123456' }).success).toBe(true);
+  test('password optional but min 8', () => {
+    expect(updateEmployeeSchema.safeParse({ password: '1234567' }).success).toBe(false);
+    expect(updateEmployeeSchema.safeParse({ password: '12345678' }).success).toBe(true);
   });
 });
 

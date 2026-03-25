@@ -63,7 +63,7 @@ describe('Auth Endpoints', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as any;
     expect(body.success).toBe(true);
-    expect(body.data.sub).toBe(TEST_ADMIN.sub);
+    expect(body.data.id).toBe(TEST_ADMIN.sub);
   });
 
   test('POST /api/auth/qr-login with invalid token → error', async () => {

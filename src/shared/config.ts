@@ -14,3 +14,6 @@ export const LNG_MAX = 180;
 
 /** Maximum allowed OT rate value (covers multiplier ≤10× and fixed-rate cap) */
 export const MAX_OT_RATE = 10;
+
+/** Days before a QR token expires and must be regenerated */
+export const QR_TOKEN_VALIDITY_DAYS = 90;

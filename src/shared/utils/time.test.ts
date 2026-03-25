@@ -75,6 +75,16 @@ describe('calculateOTHours', () => {
   test('fractional OT hours', () => {
     expect(calculateOTHours(9.5, '08:00', '17:00')).toBeCloseTo(0.5, 2);
   });
+
+  test('night shift crosses midnight — no OT at exact hours', () => {
+    // shift 22:00–06:00 = 8 hours
+    expect(calculateOTHours(8, '22:00', '06:00')).toBe(0);
+  });
+
+  test('night shift crosses midnight — OT when over', () => {
+    // shift 22:00–06:00 = 8 hours, worked 10 hours → 2 hours OT
+    expect(calculateOTHours(10, '22:00', '06:00')).toBe(2);
+  });
 });
 
 describe('todayDate', () => {

@@ -10,6 +10,7 @@ import {
   time,
   pgEnum,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // Enums
@@ -30,6 +31,7 @@ export const workLocations = pgTable('work_locations', {
   lat: real('lat').notNull(),
   lng: real('lng').notNull(),
   radiusMeters: real('radius_meters').notNull().default(200),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -39,7 +41,7 @@ export const employees = pgTable('employees', {
   id: text('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
   nickname: varchar('nickname', { length: 100 }),
-  email: varchar('email', { length: 255 }).notNull().unique(),
+  email: varchar('email', { length: 255 }).notNull(), // uniqueness enforced via partial index (active employees only)
   passwordHash: text('password_hash').notNull(),
   department: varchar('department', { length: 255 }).notNull(),
   position: varchar('position', { length: 255 }).notNull(),
@@ -53,7 +55,10 @@ export const employees = pgTable('employees', {
   otRateValue: real('ot_rate_value'),
   avatarUrl: text('avatar_url'),
   qrToken: text('qr_token').unique(),
+  qrTokenExpiresAt: timestamp('qr_token_expires_at'),
   accessibleMenus: text('accessible_menus'), // JSON array e.g. '["dashboard","requests"]'
+  adminPinHash: text('admin_pin_hash'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -79,7 +84,7 @@ export const attendanceLogs = pgTable('attendance_logs', {
   employeeIdIdx: index('attendance_logs_employee_id_idx').on(t.employeeId),
   dateIdx: index('attendance_logs_date_idx').on(t.date),
   statusIdx: index('attendance_logs_status_idx').on(t.status),
-  employeeDateIdx: index('attendance_logs_employee_date_idx').on(t.employeeId, t.date),
+  employeeDateIdx: uniqueIndex('attendance_logs_employee_date_unique').on(t.employeeId, t.date),
 }));
 
 // OT Requests

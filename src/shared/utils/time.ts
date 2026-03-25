@@ -15,13 +15,15 @@ export function calculateWorkHours(checkIn: string, checkOut: string): number {
   return Math.max(0, diff / (1000 * 60 * 60));
 }
 
-// Calculate OT hours
+// Calculate OT hours — handles night shifts (shiftEnd < shiftStart crosses midnight)
 export function calculateOTHours(
   workHours: number,
   shiftStart: string,
   shiftEnd: string
 ): number {
-  const shiftHours = (timeToMinutes(shiftEnd) - timeToMinutes(shiftStart)) / 60;
+  let shiftMinutes = timeToMinutes(shiftEnd) - timeToMinutes(shiftStart);
+  if (shiftMinutes <= 0) shiftMinutes += 24 * 60; // crosses midnight
+  const shiftHours = shiftMinutes / 60;
   return Math.max(0, workHours - shiftHours);
 }
 

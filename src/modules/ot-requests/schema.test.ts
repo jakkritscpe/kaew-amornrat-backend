@@ -9,6 +9,26 @@ describe('submitOTSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  test('night shift OT (crosses midnight) is valid', () => {
+    // 22:00 → 02:00 = 4 hours OT
+    expect(submitOTSchema.safeParse({
+      date: '2026-03-19', startTime: '22:00', endTime: '02:00', reason: 'กะดึก',
+    }).success).toBe(true);
+  });
+
+  test('same startTime and endTime is invalid', () => {
+    expect(submitOTSchema.safeParse({
+      date: '2026-03-19', startTime: '18:00', endTime: '18:00', reason: 'งานด่วน',
+    }).success).toBe(false);
+  });
+
+  test('OT over 12 hours is invalid', () => {
+    // 06:00 → 19:00 = 13 hours
+    expect(submitOTSchema.safeParse({
+      date: '2026-03-19', startTime: '06:00', endTime: '19:00', reason: 'งานด่วน',
+    }).success).toBe(false);
+  });
+
   test('reason required (min 1)', () => {
     expect(submitOTSchema.safeParse({
       date: '2026-03-19', startTime: '18:00', endTime: '20:00', reason: '',

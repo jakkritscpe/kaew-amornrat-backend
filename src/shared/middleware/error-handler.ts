@@ -8,5 +8,5 @@ export function errorHandler(err: Error, c: Context) {
   }
 
   const status = (err as { status?: number }).status ?? 500;
-  return c.json(fail(err.message || 'Internal server error'), status as 400 | 401 | 403 | 404 | 500);
+  return c.json(fail(err.message || 'Internal server error'), status as 400 | 401 | 403 | 404 | 428 | 500);
 }

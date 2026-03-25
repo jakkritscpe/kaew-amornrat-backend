@@ -37,6 +37,16 @@ mock.module('../../db/schema', () => ({
     id: 'id',
     name: 'name',
     department: 'department',
+    shiftStartTime: 'shift_start_time',
+    shiftEndTime: 'shift_end_time',
+    deletedAt: 'deleted_at',
+  },
+  workLocations: {
+    id: 'id',
+    lat: 'lat',
+    lng: 'lng',
+    radiusMeters: 'radius_meters',
+    deletedAt: 'deleted_at',
   },
 }));
 
@@ -58,17 +68,6 @@ const mockGetEmployee = mock(() =>
 
 mock.module('../employees/service', () => ({
   getEmployee: mockGetEmployee,
-}));
-
-// Mock locations service
-const mockListLocations = mock(() =>
-  Promise.resolve([
-    { id: 'loc_001', name: 'สำนักงานใหญ่', lat: 13.7563, lng: 100.5018, radiusMeters: 200 },
-  ])
-);
-
-mock.module('../locations/service', () => ({
-  listLocations: mockListLocations,
 }));
 
 // Mock WebSocket manager
@@ -93,7 +92,6 @@ const { getTodayLog, checkIn, checkOut, updateLog, getLogs } = await import('./s
 
 function resetMocks() {
   mockGetEmployee.mockClear();
-  mockListLocations.mockClear();
   mockBroadcast.mockClear();
   mockSelect.mockClear();
   mockInsert.mockClear();
@@ -168,9 +166,6 @@ describe('checkIn', () => {
   });
 
   test('throws if outside geofence', async () => {
-    // No existing log
-    setupSelectReturn([]);
-
     mockGetEmployee.mockResolvedValue({
       id: 'emp_001',
       name: 'สมชาย',
@@ -190,6 +185,24 @@ describe('checkIn', () => {
       qrToken: null,
       accessibleMenus: [],
       createdAt: new Date(),
+    });
+
+    // 1st call → no existing log, 2nd call → location row
+    const location = { id: 'loc_001', lat: 13.7563, lng: 100.5018, radiusMeters: 200 };
+    let callIdx = 0;
+    mockSelect.mockImplementation(() => {
+      callIdx++;
+      const value = callIdx === 1 ? [] : [location];
+      const chain = {
+        from: mock(() => chain),
+        leftJoin: mock(() => chain),
+        where: mock(() => chain),
+        orderBy: mock(() => chain),
+        limit: mock(() => chain),
+        offset: mock(() => chain),
+        then: (resolve: (v: unknown) => void) => resolve(value),
+      };
+      return chain as any;
     });
 
     try {
@@ -240,7 +253,8 @@ describe('checkIn', () => {
       status: 'present',
     };
 
-    // First call returns [] (no existing), subsequent calls for getTodayLog return the log
+    // 1st call → no existing log (employee has no locationId so no location query),
+    // 2nd call → getTodayLog at end of checkIn returns the inserted log
     let callCount = 0;
     mockSelect.mockImplementation(() => {
       callCount++;
@@ -338,19 +352,47 @@ describe('checkOut', () => {
 describe('updateLog', () => {
   beforeEach(resetMocks);
 
+  function setupUpdateLogMocks(existingLog: object, updatedLog: object, employeeRow?: object) {
+    // Each call to db.select returns a different value (in sequence)
+    let callIdx = 0;
+    mockSelect.mockImplementation(() => {
+      callIdx++;
+      const returnValues: unknown[] = [
+        [existingLog],                          // 1st call: fetch existing log
+        ...(employeeRow ? [[employeeRow]] : []), // 2nd call (optional): fetch employee shift
+        [updatedLog],                           // last call: fetch updated log
+      ];
+      const value = returnValues[Math.min(callIdx - 1, returnValues.length - 1)];
+      const chain = {
+        from: mock(() => chain),
+        leftJoin: mock(() => chain),
+        where: mock(() => chain),
+        orderBy: mock(() => chain),
+        limit: mock(() => chain),
+        offset: mock(() => chain),
+        then: (resolve: (v: unknown) => void) => resolve(value),
+      };
+      return chain as any;
+    });
+
+    const mockSetFn = mock(() => ({ where: mock(() => Promise.resolve()) }));
+    mockUpdate.mockReturnValue({ set: mockSetFn } as any);
+    return mockSetFn;
+  }
+
   test('updates partial fields', async () => {
-    const mockWhere = mock(() => Promise.resolve());
-    mockUpdate.mockReturnValue({
-      set: mock(() => ({ where: mockWhere })),
-    } as any);
+    const existing = { id: 'log_001', employeeId: 'emp_001', checkInTime: null, checkOutTime: null };
+    const updated = { ...existing, status: 'late' };
+    setupUpdateLogMocks(existing, updated);
 
     await updateLog('log_001', { status: 'late' });
     expect(mockUpdate).toHaveBeenCalled();
   });
 
   test('converts checkInTime string to Date', async () => {
-    const mockSetFn = mock(() => ({ where: mock(() => Promise.resolve()) }));
-    mockUpdate.mockReturnValue({ set: mockSetFn } as any);
+    const existing = { id: 'log_001', employeeId: 'emp_001', checkInTime: null, checkOutTime: null };
+    const updated = { ...existing, checkInTime: new Date('2026-03-19T08:00:00Z') };
+    const mockSetFn = setupUpdateLogMocks(existing, updated);
 
     await updateLog('log_001', { checkInTime: '2026-03-19T08:00:00Z' });
 
@@ -359,12 +401,27 @@ describe('updateLog', () => {
   });
 
   test('converts checkOutTime string to Date', async () => {
-    const mockSetFn = mock(() => ({ where: mock(() => Promise.resolve()) }));
-    mockUpdate.mockReturnValue({ set: mockSetFn } as any);
+    const existing = { id: 'log_001', employeeId: 'emp_001', checkInTime: null, checkOutTime: null };
+    const updated = { ...existing, checkOutTime: new Date('2026-03-19T17:00:00Z') };
+    const mockSetFn = setupUpdateLogMocks(existing, updated);
 
     await updateLog('log_001', { checkOutTime: '2026-03-19T17:00:00Z' });
 
     const setArg = mockSetFn.mock.calls[0][0];
     expect(setArg.checkOutTime).toBeInstanceOf(Date);
+  });
+
+  test('recalculates workHours and otHours when both checkIn and checkOut are present', async () => {
+    const checkIn = new Date('2026-03-19T01:00:00Z'); // 08:00 Bangkok
+    const existing = { id: 'log_001', employeeId: 'emp_001', checkInTime: checkIn, checkOutTime: null };
+    const updated = { ...existing, checkOutTime: new Date('2026-03-19T09:00:00Z'), workHours: 8, otHours: 0 };
+    const emp = { shiftStartTime: '08:00', shiftEndTime: '17:00' };
+    const mockSetFn = setupUpdateLogMocks(existing, updated, emp);
+
+    await updateLog('log_001', { checkOutTime: '2026-03-19T09:00:00Z' });
+
+    const setArg = mockSetFn.mock.calls[0][0];
+    expect(typeof setArg.workHours).toBe('number');
+    expect(typeof setArg.otHours).toBe('number');
   });
 });

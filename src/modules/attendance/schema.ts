@@ -21,9 +21,9 @@ export const listLogsSchema = z.object({
 });
 
 export const updateLogSchema = z.object({
-  checkInTime: z.string().optional(),
-  checkOutTime: z.string().optional(),
+  checkInTime: z.string().datetime({ offset: true }).optional(),
+  checkOutTime: z.string().datetime({ offset: true }).optional(),
   status: z.enum(['present', 'late', 'absent', 'on_leave']).optional(),
-  workHours: z.number().optional(),
-  otHours: z.number().optional(),
+  workHours: z.number().min(0).optional(),
+  otHours: z.number().min(0).optional(),
 });

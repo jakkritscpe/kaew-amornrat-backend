@@ -134,14 +134,14 @@ describe('authMiddleware', () => {
     const { app, cleanup } = createApp();
     try {
       const token = await createTestJWT({
-        sub: 'emp_001', name: 'Test', email: 'test@test.com', role: 'admin',
+        sub: 'emp_admin', name: 'Test', email: 'test@test.com', role: 'admin',
       });
       const res = await app.request('/test', {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(res.status).toBe(200);
       const body = await res.json() as any;
-      expect(body.sub).toBe('emp_001');
+      expect(body.sub).toBe('emp_admin');
     } finally {
       cleanup();
     }
@@ -163,10 +163,12 @@ describe('guardRole', () => {
   }
 
   test('403 when role not in allowed list', async () => {
+    // Use emp_admin as sub (active employee) but put 'employee' role in JWT payload
+    // guardRole checks payload.role, not the DB role — so this correctly tests 403
     const { app, cleanup } = createApp(['admin']);
     try {
       const token = await createTestJWT({
-        sub: 'emp_001', name: 'Test', email: 'test@test.com', role: 'employee',
+        sub: 'emp_admin', name: 'Test', email: 'test@test.com', role: 'employee',
       });
       const res = await app.request('/test', {
         headers: { Authorization: `Bearer ${token}` },
@@ -181,7 +183,7 @@ describe('guardRole', () => {
     const { app, cleanup } = createApp(['admin', 'manager']);
     try {
       const token = await createTestJWT({
-        sub: 'emp_001', name: 'Test', email: 'test@test.com', role: 'admin',
+        sub: 'emp_admin', name: 'Test', email: 'test@test.com', role: 'admin',
       });
       const res = await app.request('/test', {
         headers: { Authorization: `Bearer ${token}` },
@@ -196,7 +198,7 @@ describe('guardRole', () => {
     const { app, cleanup } = createApp(['admin', 'manager']);
     try {
       const token = await createTestJWT({
-        sub: 'emp_002', name: 'Manager', email: 'mgr@test.com', role: 'manager',
+        sub: 'emp_admin', name: 'Manager', email: 'mgr@test.com', role: 'manager',
       });
       const res = await app.request('/test', {
         headers: { Authorization: `Bearer ${token}` },
