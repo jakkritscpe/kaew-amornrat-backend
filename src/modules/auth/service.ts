@@ -113,4 +113,13 @@ export async function qrLoginService(qrToken: string) {
   };
 }
 
+// Short-lived token for WebSocket auth (cross-domain — cookie cannot be sent on WS upgrade)
+export async function signWsToken(payload: { sub: string; name: string; role: string; email: string }): Promise<string> {
+  return signJWT(
+    { sub: payload.sub, name: payload.name, role: payload.role, email: payload.email, ws: true },
+    process.env.JWT_SECRET!,
+    60 // 60 seconds — only needs to last for the upgrade handshake
+  );
+}
+
 export { hashPassword };

@@ -1,19 +1,35 @@
 import { Hono } from 'hono';
 import { createBunWebSocket } from 'hono/bun';
 import { wsManager } from '../../shared/ws/manager';
-import { authMiddleware, guardRole } from '../../shared/middleware/auth';
+import { authMiddleware, guardRole, verifyJWT } from '../../shared/middleware/auth';
+import { fail } from '../../shared/utils/response';
 import type { JWTPayload } from '../../shared/types';
 
 const { upgradeWebSocket, websocket } = createBunWebSocket();
 
 const wsRouter = new Hono();
 
-// Auth is verified at HTTP upgrade time via authMiddleware (reads HttpOnly cookie).
-// Unauthenticated or low-privilege connections receive a 401/403 HTTP response and
-// the upgrade is never established — no need for first-message auth.
+// Middleware: accept auth via HttpOnly cookie (same-origin) OR ?token= query param (cross-domain).
+// The ?token= path is used when frontend (Vercel) and backend (Render) are on different domains
+// so the browser cannot send the HttpOnly cookie on the WS upgrade request.
+async function wsAuthMiddleware(c: Parameters<typeof authMiddleware>[0], next: Parameters<typeof authMiddleware>[1]) {
+  const queryToken = c.req.query('token');
+  if (queryToken) {
+    try {
+      const payload = await verifyJWT(queryToken, process.env.JWT_SECRET!);
+      c.set('jwtPayload', payload);
+      return next();
+    } catch {
+      return c.json(fail('Invalid or expired WS token'), 401);
+    }
+  }
+  // Fallback: cookie-based auth (local dev / same-origin)
+  return authMiddleware(c, next);
+}
+
 wsRouter.get(
   '/',
-  authMiddleware,
+  wsAuthMiddleware,
   guardRole('admin', 'manager'),
   upgradeWebSocket((c) => {
     const payload = c.get('jwtPayload') as JWTPayload;

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { setCookie, deleteCookie } from 'hono/cookie';
 import { eq } from 'drizzle-orm';
 import { loginSchema } from './schema';
-import { loginService, qrLoginService } from './service';
+import { loginService, qrLoginService, signWsToken } from './service';
 import { authMiddleware } from '../../shared/middleware/auth';
 import { rateLimit } from '../../shared/middleware/rate-limit';
 import { ok, fail } from '../../shared/utils/response';
@@ -62,6 +62,15 @@ auth.get('/me', meRateLimit, authMiddleware, async (c) => {
     department: emp.department, position: emp.position,
     accessibleMenus: (() => { try { return emp.accessibleMenus ? JSON.parse(emp.accessibleMenus) : []; } catch { return []; } })(),
   }));
+});
+
+// GET /api/auth/ws-token — returns a short-lived (60s) token for WebSocket auth
+// Used when frontend and backend are on different domains (Vercel + Render) so
+// the HttpOnly cookie cannot be sent with the WebSocket upgrade request.
+auth.get('/ws-token', meRateLimit, authMiddleware, async (c) => {
+  const payload = c.get('jwtPayload') as JWTPayload;
+  const token = await signWsToken(payload);
+  return c.json(ok({ token }));
 });
 
 // POST /api/auth/logout
