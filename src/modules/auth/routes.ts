@@ -7,7 +7,7 @@ import { loginSchema } from './schema';
 import { loginService, qrLoginService } from './service';
 import { authMiddleware } from '../../shared/middleware/auth';
 import { rateLimit } from '../../shared/middleware/rate-limit';
-import { ok } from '../../shared/utils/response';
+import { ok, fail } from '../../shared/utils/response';
 import { db } from '../../db';
 import { employees } from '../../db/schema';
 import type { JWTPayload } from '../../shared/types';
@@ -45,7 +45,9 @@ auth.post('/login', loginRateLimit, zValidator('json', loginSchema), async (c) =
 });
 
 // GET /api/auth/me — returns full profile from DB (used to restore session on page refresh)
-auth.get('/me', authMiddleware, async (c) => {
+// Rate-limited to prevent enumeration; 60 req/min is generous for normal page refreshes
+const meRateLimit = rateLimit(60, 60 * 1000);
+auth.get('/me', meRateLimit, authMiddleware, async (c) => {
   const payload = c.get('jwtPayload') as JWTPayload;
   const [emp] = await db
     .select({
@@ -53,7 +55,7 @@ auth.get('/me', authMiddleware, async (c) => {
       department: employees.department, position: employees.position, accessibleMenus: employees.accessibleMenus,
     })
     .from(employees).where(eq(employees.id, payload.sub)).limit(1);
-  if (!emp) return c.json({ success: false, error: 'User not found' }, 404);
+  if (!emp) return c.json(fail('User not found'), 404);
 
   return c.json(ok({
     id: emp.id, name: emp.name, email: emp.email, role: emp.role,
