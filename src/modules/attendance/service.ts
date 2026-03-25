@@ -175,9 +175,17 @@ export async function updateLog(id: string, data: Partial<{
   workHours: number; otHours: number;
 }>) {
   const [existing] = await db
-    .select({ id: attendanceLogs.id, employeeId: attendanceLogs.employeeId, checkInTime: attendanceLogs.checkInTime, checkOutTime: attendanceLogs.checkOutTime })
+    .select({ id: attendanceLogs.id, employeeId: attendanceLogs.employeeId, date: attendanceLogs.date, checkInTime: attendanceLogs.checkInTime, checkOutTime: attendanceLogs.checkOutTime })
     .from(attendanceLogs).where(eq(attendanceLogs.id, id)).limit(1);
   if (!existing) throw notFound('Attendance log not found');
+
+  // Prevent shifting checkInTime to a different calendar date — would corrupt the (employee_id, date) record
+  if (data.checkInTime) {
+    const newDate = new Date(data.checkInTime).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    if (newDate !== existing.date) {
+      throw badRequest('ไม่สามารถเปลี่ยนวันที่ของ check-in ได้ (ต้องอยู่ในวันที่เดิม)');
+    }
+  }
 
   const updates: Record<string, unknown> = { ...data, updatedAt: new Date() };
   if (data.checkInTime) updates.checkInTime = new Date(data.checkInTime);

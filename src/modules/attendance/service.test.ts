@@ -390,7 +390,7 @@ describe('updateLog', () => {
   });
 
   test('converts checkInTime string to Date', async () => {
-    const existing = { id: 'log_001', employeeId: 'emp_001', checkInTime: null, checkOutTime: null };
+    const existing = { id: 'log_001', employeeId: 'emp_001', date: '2026-03-19', checkInTime: null, checkOutTime: null };
     const updated = { ...existing, checkInTime: new Date('2026-03-19T08:00:00Z') };
     const mockSetFn = setupUpdateLogMocks(existing, updated);
 

@@ -71,7 +71,6 @@ employeesRouter.get('/:id/qr-token', guardRole('admin', 'manager'), async (c) =>
     employeeId: employee.id,
     employeeName: employee.name,
     qrUrl: `${frontendUrl}/employee/qr-login/${employee.qrToken}`,
-    qrToken: employee.qrToken,
   }));
 });
 
@@ -83,7 +82,6 @@ employeesRouter.post('/:id/regenerate-qr', guardRole('admin'), async (c) => {
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
   return c.json(ok({
     qrUrl: `${frontendUrl}/employee/qr-login/${newToken}`,
-    qrToken: newToken,
     expiresAt: qrTokenExpiresAt.toISOString(),
   }, 'QR code regenerated'));
 });

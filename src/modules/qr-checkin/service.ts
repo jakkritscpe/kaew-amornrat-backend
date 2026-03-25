@@ -1,7 +1,7 @@
 import { eq, isNull, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { employees } from '../../db/schema';
-import { notFound, gone } from '../../shared/utils/errors';
+import { notFound } from '../../shared/utils/errors';
 import { checkIn, checkOut, getTodayLog } from '../attendance/service';
 
 async function resolveEmployeeId(qrToken: string): Promise<string> {
@@ -10,9 +10,8 @@ async function resolveEmployeeId(qrToken: string): Promise<string> {
     .from(employees)
     .where(and(eq(employees.qrToken, qrToken), isNull(employees.deletedAt)))
     .limit(1);
-  if (!row) throw notFound('Employee not found');
-  if (row.qrTokenExpiresAt && row.qrTokenExpiresAt < new Date()) {
-    throw gone('QR code หมดอายุแล้ว กรุณาติดต่อผู้ดูแลระบบ');
+  if (!row || (row.qrTokenExpiresAt && row.qrTokenExpiresAt < new Date())) {
+    throw notFound('QR code ไม่ถูกต้องหรือหมดอายุ');
   }
   return row.id;
 }
@@ -23,9 +22,8 @@ export async function getEmployeePublicInfo(qrToken: string) {
     .from(employees)
     .where(and(eq(employees.qrToken, qrToken), isNull(employees.deletedAt)))
     .limit(1);
-  if (!row) throw notFound('Employee not found');
-  if (row.qrTokenExpiresAt && row.qrTokenExpiresAt < new Date()) {
-    throw gone('QR code หมดอายุแล้ว กรุณาติดต่อผู้ดูแลระบบ');
+  if (!row || (row.qrTokenExpiresAt && row.qrTokenExpiresAt < new Date())) {
+    throw notFound('QR code ไม่ถูกต้องหรือหมดอายุ');
   }
   const { qrTokenExpiresAt: _, ...publicInfo } = row;
   return publicInfo;

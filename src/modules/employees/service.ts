@@ -94,7 +94,6 @@ export async function getEmployee(id: string) {
       otRateType: employees.otRateType,
       otRateValue: employees.otRateValue,
       avatarUrl: employees.avatarUrl,
-      qrToken: employees.qrToken,
       accessibleMenus: employees.accessibleMenus,
       createdAt: employees.createdAt,
     })

@@ -1,14 +1,13 @@
 import { z } from 'zod';
+import { LAT_MIN, LAT_MAX, LNG_MIN, LNG_MAX } from '../../shared/config';
 
-export const checkInSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
+const coordSchema = z.object({
+  lat: z.number().min(LAT_MIN).max(LAT_MAX),
+  lng: z.number().min(LNG_MIN).max(LNG_MAX),
 });
 
-export const checkOutSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-});
+export const checkInSchema = coordSchema;
+export const checkOutSchema = coordSchema;
 
 export const listLogsSchema = z.object({
   employeeId: z.string().optional(),

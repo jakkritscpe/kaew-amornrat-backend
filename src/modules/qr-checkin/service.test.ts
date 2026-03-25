@@ -68,7 +68,7 @@ describe('getEmployeePublicInfo', () => {
       await getEmployeePublicInfo('invalid-token');
       expect(true).toBe(false);
     } catch (err: any) {
-      expect(err.message).toBe('Employee not found');
+      expect(err.message).toBe('QR code ไม่ถูกต้องหรือหมดอายุ');
       expect(err.status).toBe(404);
     }
   });
