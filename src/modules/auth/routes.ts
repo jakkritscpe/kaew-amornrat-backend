@@ -35,9 +35,9 @@ const loginRateLimit = rateLimit(10, 15 * 60 * 1000);
 // POST /api/auth/login
 auth.post('/login', loginRateLimit, zValidator('json', loginSchema), async (c) => {
   const { email, password } = c.req.valid('json');
-  const result = await loginService(email, password);
-  setAuthCookie(c, result.token, 7 * 24 * 60 * 60); // 7 days
-  return c.json(ok(result, 'Login successful'));
+  const { token, user } = await loginService(email, password);
+  setAuthCookie(c, token, 7 * 24 * 60 * 60); // 7 days
+  return c.json(ok({ user }, 'Login successful'));
 });
 
 // GET /api/auth/me — returns full profile from DB (used to restore session on page refresh)
@@ -67,9 +67,9 @@ auth.post('/logout', (c) => {
 // POST /api/auth/qr-login
 auth.post('/qr-login', loginRateLimit, zValidator('json', z.object({ token: z.string() })), async (c) => {
   const { token } = c.req.valid('json');
-  const result = await qrLoginService(token);
-  setAuthCookie(c, result.token, 30 * 24 * 60 * 60); // 30 days
-  return c.json(ok(result, 'Login successful'));
+  const { token: jwt, user } = await qrLoginService(token);
+  setAuthCookie(c, jwt, 30 * 24 * 60 * 60); // 30 days
+  return c.json(ok({ user }, 'Login successful'));
 });
 
 export default auth;
