@@ -103,6 +103,19 @@ export const otRequests = pgTable('ot_requests', {
   statusIdx: index('ot_requests_status_idx').on(t.status),
 }));
 
+// Holidays
+export const holidays = pgTable('holidays', {
+  id: text('id').primaryKey(),
+  date: date('date').notNull(), // YYYY-MM-DD
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  isRecurring: boolean('is_recurring').notNull().default(false), // true = applies every year by month+day
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  dateIdx: index('holidays_date_idx').on(t.date),
+}));
+
 // Company Settings (single row)
 export const companySettings = pgTable('company_settings', {
   id: text('id').primaryKey().default('default'),
