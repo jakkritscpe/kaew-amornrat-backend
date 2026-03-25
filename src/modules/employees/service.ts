@@ -105,6 +105,16 @@ export async function getEmployee(id: string) {
   return { ...row, accessibleMenus: parseAccessibleMenus(row.accessibleMenus) };
 }
 
+export async function getEmployeeQrToken(id: string) {
+  const [row] = await db
+    .select({ id: employees.id, name: employees.name, qrToken: employees.qrToken })
+    .from(employees)
+    .where(and(eq(employees.id, id), isNull(employees.deletedAt)))
+    .limit(1);
+  if (!row) throw notFound('Employee not found');
+  return row;
+}
+
 export async function createEmployee(data: {
   name: string; nickname?: string; email: string; password: string;
   department: string; position: string; role: 'admin' | 'manager' | 'employee';

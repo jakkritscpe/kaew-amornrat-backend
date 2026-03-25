@@ -4,7 +4,7 @@ import { authMiddleware, guardRole } from '../../shared/middleware/auth';
 import { rateLimit } from '../../shared/middleware/rate-limit';
 import { ok, fail } from '../../shared/utils/response';
 import { createEmployeeSchema, updateEmployeeSchema, listEmployeesSchema, updateMenusSchema, verifyPinSchema, setPinSchema } from './schema';
-import { listEmployees, getEmployee, createEmployee, updateEmployee, removeEmployee, verifyAdminPin, setAdminPin } from './service';
+import { listEmployees, getEmployee, getEmployeeQrToken, createEmployee, updateEmployee, removeEmployee, verifyAdminPin, setAdminPin } from './service';
 import { QR_TOKEN_VALIDITY_DAYS } from '../../shared/config';
 import type { JWTPayload } from '../../shared/types';
 
@@ -65,7 +65,7 @@ employeesRouter.delete('/:id', guardRole('admin'), async (c) => {
 
 // GET /api/employees/:id/qr-token (admin/manager only - get QR URL for printing)
 employeesRouter.get('/:id/qr-token', guardRole('admin', 'manager'), async (c) => {
-  const employee = await getEmployee(c.req.param('id'));
+  const employee = await getEmployeeQrToken(c.req.param('id'));
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
   return c.json(ok({
     employeeId: employee.id,
