@@ -33,7 +33,6 @@ const VALID_MENU_IDS = [
   'attendance/ot-approvals',
   'attendance/ot-calculator',
   'attendance/reports',
-  'attendance/holidays',
   'settings',
 ] as const;
 

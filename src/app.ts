@@ -12,7 +12,6 @@ import attendanceRoutes from './modules/attendance/routes';
 import otRoutes from './modules/ot-requests/routes';
 import settingsRoutes from './modules/settings/routes';
 import qrRoutes from './modules/qr-checkin/routes';
-import holidaysRoutes from './modules/holidays/routes';
 import wsRouter, { websocket } from './modules/ws/routes';
 
 export interface Variables {
@@ -54,7 +53,6 @@ export function createApp() {
   app.route('/api/ot-requests', otRoutes);
   app.route('/api/settings', settingsRoutes);
   app.route('/api/qr-checkin', qrRoutes);
-  app.route('/api/holidays', holidaysRoutes);
   app.route('/ws', wsRouter);
 
   return app;
