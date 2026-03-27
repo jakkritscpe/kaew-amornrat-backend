@@ -33,8 +33,8 @@ function setAuthCookie(c: Parameters<typeof setCookie>[0], token: string, maxAge
   });
 }
 
-// 10 login attempts per 15 minutes per IP
-const loginRateLimit = rateLimit(10, 15 * 60 * 1000);
+// 30 login attempts per 15 minutes per IP (generous for E2E test runs)
+const loginRateLimit = rateLimit(30, 15 * 60 * 1000);
 
 // POST /api/auth/login
 auth.post('/login', loginRateLimit, zValidator('json', loginSchema), async (c) => {
